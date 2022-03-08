@@ -1,0 +1,101 @@
+import tweepy
+import pandas as pd
+from textblob import TextBlob
+import re
+import matplotlib.pyplot as plt
+plt.style.use('fivethirtyeight')
+consumer_key: str = "JvP6SALYgYN6FHKgAW7MBXeCv"
+consumer_secret: str = "KJFczocadXq3IxLIotz3rLOlFcQBuP5QPsKSWXwtjzNYbkNSb4"
+access_token: str = "1379793831994945536-Eb7GYmlFJvCcE7TTBv5YCEXnDYep0Z"
+access_token_secret: str = "0DQEthNO7hRB3rfNsCW894dkuEnrtGw1Y9KHID7V1uigH"
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+auth.set_access_token(access_token, access_token_secret)
+api = tweepy.API(auth, wait_on_rate_limit = True)
+name = input('Enter the twitter handle id\n')
+posts = api.user_timeline(screen_name=name, count=100, language = "en", tweet_mode="extended")
+
+df = pd.DataFrame( [tweet.full_text for tweet in posts], columns = ['tweets'])
+# print(df.shape[0])
+#creating a fn that clean the texts
+def cleanTxt(text):
+    text = re.sub(r'@[A-Za-z0-9]+' , '', text) # (sub = subtitute)it removes @ mentions and r tells python that the text is raw
+    text = re.sub(r'#', '', text) # removing the #
+    text = re.sub(r'RT[\s]+', '', text) # rt for removing retweets and white spaces
+    text = re.sub(r'https?:\/\/\S+', '', text) # removing the hyperlink
+    return text
+#cleaning the text
+df['tweets']= df['tweets'].apply(cleanTxt)
+
+#creating subjectivity
+def getSubjectivity(text):
+    return TextBlob(text).sentiment.subjectivity
+#creating polarity
+def getPolarity(text):
+    return TextBlob(text).sentiment.polarity
+#creating two columns for subjectivity and polarity
+df['Subjectivity'] = df['tweets'].apply(getSubjectivity)
+df['Polarity'] = df['tweets'].apply(getPolarity)
+#showing new dataframe with new columns
+
+#creating a fn to compute positive,negative & neutral analysis
+def getAnalysis(score):
+    if score < 0:
+        return 'Negative'
+    elif score == 0:
+        return 'Neutral'
+    else:
+        return 'Positive'
+
+
+def display(dataframe, choice):
+    if choice == 1: # Positive
+        d = dataframe.loc[dataframe['Analysis'] == 'Positive']
+        print('Total number of Positive tweets = ', str(d.shape[0]), '\n')
+    elif choice == 2: # Negative
+        d = dataframe.loc[dataframe['Analysis'] == 'Negative']
+        print('Total number of Negative tweets = ', str(d.shape[0]), '\n')
+    elif choice == 3: # Neutral
+        d = dataframe.loc[dataframe['Analysis'] == 'Neutral']
+        print('Total number of Neutral tweets = ', str(d.shape[0]), '\n')
+    return d
+
+
+df['Analysis'] = df['Polarity'].apply(getAnalysis)
+# Printing all the positive tweets
+#j=1
+sortedDF = df.sort_values(by=['Polarity'])
+
+# getting the % of positive, negative & neutral tweets
+ptweets = df[df.Analysis == 'Positive']
+ptweets = ptweets['tweets']
+percentage = round((ptweets.shape[0] / df.shape[0]) * 100, 1)
+print("The percentage of positive tweets is " + str(percentage) + '%')
+
+ptweets = df[df.Analysis == 'Negative']
+ptweets = ptweets['tweets']
+percentage = round( (ptweets.shape[0] / df.shape[0]) * 100, 1)
+print("The percentage of negative tweets is " + str(percentage) + '%')
+
+ptweets = df[df.Analysis == 'Neutral']
+ptweets = ptweets['tweets']
+percentage = round( (ptweets.shape[0] / df.shape[0]) * 100, 1)
+print("The percentage of Neutral tweets is " + str(percentage) + '%')
+# showing the value counts
+df['Analysis'].value_counts()
+# plot and visualize the counts
+plt.title('Sentiment Analysis')
+df['Analysis'].value_counts().plot(kind='pie')
+plt.show()
+inp = 1
+while inp != 4:
+    inp = int(input('Enter 1 for positive, 2 for Negative, 3 for Neutral tweets and 4 for exit\n'))
+    if inp == 4:
+        break
+    elif inp < 4:
+        df1 = display(sortedDF, inp)
+        for i, tw in enumerate(df1['tweets']):
+            print(str(i+1) + ' - ' + tw)
+df.to_csv('my_new_file.csv', index = False)
+pd.read_csv('my_new_file.csv')
+
+
